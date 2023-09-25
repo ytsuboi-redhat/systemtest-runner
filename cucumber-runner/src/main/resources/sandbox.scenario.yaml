@@ -1,0 +1,8 @@
+feature:
+  name: sandbox
+  description: 
+  scenarios:
+    - name: sandbox scenario
+      description: desc
+      steps:
+       - {target: apply, name: バッチ処理にて審査システムへ申し込み情報が連携される}

@@ -2,21 +2,17 @@ package com.redhat.jp.labs.example.systemtest.runner;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
-import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Hello world!
- *
- */
+import com.redhat.jp.labs.example.systemtest.runner.schema.SystemTestFeature;
+import com.redhat.jp.labs.example.systemtest.runner.schema.SystemTestScenario;
+import com.redhat.jp.labs.example.systemtest.runner.schema.SystemTestScenarioStep;
+import com.redhat.jp.labs.example.systemtest.runner.schema.SystemTestScenarioStep.ScenarioStatus;
+
 public class App {
 
     private static Logger logger = LoggerFactory.getLogger(App.class);
@@ -40,13 +36,67 @@ public class App {
     }
 
     void run() throws IOException {
-        String testResourcesBaseDir = this.configuration.getProperty("systemtestrunner.test.basedir");
-        List<SystemTestScenario> scenarios = SystemTestScenarioBuilder.build();
-        scenarios.stream().forEach(s -> {
-            String targetDir = testResourcesBaseDir + this.configuration.getProperty("systemtestrunner.workdir." + s.getTarget());
-            logger.info("{}({}) - {}", s.getTarget(), targetDir, s.getScenarioTitle());
-            executionService.execute(s.getScenarioTitle(), targetDir);
+        List<SystemTestFeature> features = SystemTestScenarioBuilder.build();
+        
+        try {
+            features.stream().forEach(this::runScenarios);
+        } catch (ExecutionFailureException e) {
+            printErrorScenario(e.getTarget());
+            throw new IOException(e);
+        } finally {
+            String report = buildReport(features);
+            logger.info(report);
+        }
+    }
+
+    void runScenarios(SystemTestFeature feature) {
+        feature.getScenarios().stream().forEach(scenario -> {
+            logger.info("実行するシナリオ: {}", scenario.getName());
+            runSteps(scenario.getSteps(), feature, scenario);
         });
+    }
+
+    void runSteps(List<SystemTestScenarioStep> steps, SystemTestFeature feature, SystemTestScenario scenario) {
+        scenario.setParent(feature);
+        String testResourcesBaseDir = this.configuration.getProperty("systemtestrunner.test.basedir");
+        steps.stream().forEach(s -> {
+            s.setParent(scenario);
+            String targetDir = testResourcesBaseDir + this.configuration.getProperty("systemtestrunner.workdir." + s.getTarget());
+            logger.info("実行するシナリオのステップ: {}({}) - {}", s.getTarget(), targetDir, s.getName());
+            int returnCode = executionService.execute(s.getName(), targetDir);
+            if (returnCode == 0) {
+                s.setStatus(ScenarioStatus.SUCCESS);
+            } else {
+                s.setStatus(ScenarioStatus.FAIL);
+                throw new ExecutionFailureException(s);
+            }
+        });
+    }
+
+    void printErrorScenario(SystemTestScenarioStep step) {
+        StringBuilder messageBuilder = new StringBuilder();
+        messageBuilder.append(String.format("失敗したシナリオ:%n"));
+        messageBuilder.append(String.format("feature: %s%n", step.getParent().getParent().getName()));
+        messageBuilder.append(String.format("  scenario: %s%n", step.getParent().getName()));
+        messageBuilder.append(String.format("    %s / %s", step.getTarget(), step.getName()));
+        String message = messageBuilder.toString();
+        logger.error(message);
+    }
+
+    String buildReport(List<SystemTestFeature> features) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(String.format("実行結果:%n"));
+        features.stream().forEach(feature -> {
+            builder.append(String.format("feature: %s%n", feature.getName()));
+            feature.getScenarios().stream().forEach(scenario -> {
+                builder.append(String.format("  scenario: %s%n", scenario.getName()));
+                scenario.getSteps().forEach(step -> {
+                    builder.append(String.format("    [ %s ] - %s / %s%n", step.getStatus().getLabel(), step.getTarget(), step.getName()));
+                });
+            });
+        });
+        
+        return builder.toString();
     }
 
     void parseConfiguration() throws IOException {

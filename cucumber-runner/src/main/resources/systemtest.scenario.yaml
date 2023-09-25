@@ -1,0 +1,11 @@
+feature:
+  name: 白カードの新規申込
+  description: Apply, 審査(Bee), 発券(AMAOR入会) を通して、白カードの新規申込フローが流れる
+  scenarios:
+    - name: 審査OKで発券される
+      description: desc
+      steps:
+       - {target: apply, name: ユーザーAが白カードで申し込むことができる}
+       - {target: apply, name: バッチ処理にて審査システムへ申し込み情報が連携される}
+       - {target: bee, name: 自動審査を通過する }
+       - {target: amaor, name: 発券システムでXXXX}

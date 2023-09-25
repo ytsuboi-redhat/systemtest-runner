@@ -1,4 +1,7 @@
-package com.redhat.jp.labs.example.systemtest.runner;
+package com.redhat.jp.labs.example.systemtest.runner.schema;
+
+import java.io.Serializable;
+import java.util.List;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -12,13 +15,14 @@ import lombok.Setter;
 @RequiredArgsConstructor
 @Getter
 @Setter
-public class SystemTestScenario {
+public class SystemTestFeature implements Serializable {
 
     @NonNull
-    private String target;
+    private String name;
     
-    @NonNull
-    private String scenarioTitle;
+    private String description;
 
-    private boolean success = false;
+    @NonNull
+    private List<SystemTestScenario> scenarios;
+
 }
